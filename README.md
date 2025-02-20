@@ -27,11 +27,31 @@ cargo build --release
 ```
 
 ## 🚀 Usage  
-Feed it a QLOG file, and let BlazingQLOG extract exactly what you need:  
+Feed it a QLOG file, and let BlazingQLOG extract exactly what you need.
+
+For example, to get the congestion window evolution from the following QLOG file named `trace.sqlog`:
+
+```
+{"time":1.2,"name":"recovery:metrics_updated","data":{"congestion_window":50000,"bytes_in_flight":6625}}
+{"time":1.257,"name":"recovery:metrics_updated","data":{"bytes_in_flight":7875}}
+{"time":1.79,"name":"recovery:metrics_updated","data":{"congestion_window":52000,"bytes_in_flight":6000}}
+```
+
+Use the command:
 
 ```sh
-blazingqlog --input trace.qlog --filter event=packet_sent
+blazingqlog trace.sqlog data,congestion_window
 ```
+
+This will generate a CSV file named `output.csv` (this can be changed with the `--csv` flag) with the following content:
+
+```
+time,congestion_window
+1.2,50000
+1.79,52000
+```
+
+Ignoring all non-related fields.
 
 Need more speed? Run it on an NVMe SSD while sipping a Rust-branded energy drink.  
 
