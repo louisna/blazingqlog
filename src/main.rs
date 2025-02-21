@@ -1,10 +1,11 @@
 use clap::Parser;
 use csv;
+use filter::Filter;
+use filter::Pattern;
 use jsonseq;
 use serde_json::Value;
 use std::error::Error;
 use std::fs::File;
-use std::str::FromStr;
 
 #[derive(Parser)]
 struct Args {
@@ -17,20 +18,12 @@ struct Args {
     #[clap(short = 'c', long = "csv", default_value = "output.csv")]
     /// Output CSV name.
     csv_name: String,
+
+    #[clap(short = 'f', long = "filter")]
+    /// Optional filter field.
+    /// Comma-separated path to get to the filter value, which is the last element of the pattern.
+    filter: Option<Filter>,
     // ... More arguments will come, e.g., for multi-thread.
-}
-
-#[derive(Debug, Clone)]
-struct Pattern(Vec<String>);
-
-impl FromStr for Pattern {
-    type Err = clap::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Pattern(
-            s.split(",").map(|i| i.to_string()).collect::<Vec<_>>(),
-        ))
-    }
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -50,7 +43,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     for elem in json_reader {
         let value = elem?;
 
-        if let Some(v) = get_item(&value, &args.pattern) {
+        if let Some(v) = get_item(&value, &args.pattern, args.filter.as_ref()) {
             csv_wrt.serialize(v)?;
         }
     }
@@ -58,13 +51,22 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn get_item<'a>(value: &'a Value, pattern: &'a Pattern) -> Option<(f64, &'a Value)> {
+fn get_item<'a>(
+    value: &'a Value,
+    pattern: &'a Pattern,
+    filter: Option<&'a Filter>,
+) -> Option<(f64, &'a Value)> {
     // First element is always an object.
     let map = value.as_object()?;
 
     // We always record the time of the event.
     // If there is no "time", it may be the header.
     let time = map.get("time")?.as_f64()?;
+
+    // Potentially filter the entry.
+    if !filter.map(|f| f.filter(value)).unwrap_or(true) {
+        return None;
+    }
 
     // Then we iterate on the requested value.
     let value = pattern
@@ -74,3 +76,5 @@ fn get_item<'a>(value: &'a Value, pattern: &'a Pattern) -> Option<(f64, &'a Valu
 
     Some((time, value))
 }
+
+mod filter;
