@@ -1,8 +1,6 @@
 use clap::Parser;
-use csv;
 use filter::Filter;
 use filter::Pattern;
-use jsonseq;
 use serde_json::Value;
 use std::error::Error;
 use std::fs::File;
