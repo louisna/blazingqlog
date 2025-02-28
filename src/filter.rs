@@ -9,7 +9,7 @@ impl FromStr for Pattern {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(Pattern(
-            s.split(",").map(|i| i.to_string()).collect::<Vec<_>>(),
+            s.split("/").map(|i| i.to_string()).collect::<Vec<_>>(),
         ))
     }
 }
@@ -37,7 +37,7 @@ impl FromStr for Filter {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let entries = s.split(",").map(|i| i.to_string()).collect::<Vec<_>>();
+        let entries = s.split("/").map(|i| i.to_string()).collect::<Vec<_>>();
 
         // Convert value to [`ValueFilter`].
         // TODO: future might include some annotation to easier the transformation.
@@ -68,7 +68,7 @@ impl Filter {
         self.pattern
             .0
             .iter()
-            .try_fold(value, |v, p| v.as_object().and_then(|m| m.get(p)))
+            .try_fold(value, |v, p| convert_value_and_get(v, p))
             .map(|v| self.cmp_value(v))
             .unwrap_or(false)
     }
@@ -81,5 +81,16 @@ impl Filter {
             ValueFilter::String(v) => value.as_str().map(|f| f == v),
         }
         .unwrap_or(false)
+    }
+}
+
+/// Currently only returns the first matching occurence in the tree structure.
+pub fn convert_value_and_get<'a>(v: &'a Value, p: &str) -> Option<&'a Value> {
+    if let Some(m) = v.as_object() {
+        m.get(p)
+    } else if let Some(a) = v.as_array() {
+        a.iter().filter_map(|i| convert_value_and_get(i, p)).next()
+    } else {
+        None
     }
 }

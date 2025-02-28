@@ -1,4 +1,5 @@
 use clap::Parser;
+use filter::convert_value_and_get;
 use filter::Filter;
 use filter::Pattern;
 use serde_json::Value;
@@ -10,18 +11,19 @@ struct Args {
     /// QLOG file path.
     qlog_file: String,
 
-    /// Comma-separated path to get the data of interest.
-    pattern: Pattern,
+    #[clap(short = 'p', long = "pattern", num_args = 1.., value_delimiter = ',')]
+    /// Slash-separated path to get the data of interest.
+    /// Multiple values can be requested.
+    pattern: Vec<Pattern>,
 
     #[clap(short = 'c', long = "csv", default_value = "output.csv")]
     /// Output CSV name.
     csv_name: String,
 
-    #[clap(short = 'f', long = "filter")]
+    #[clap(short = 'f', long = "filter", num_args = 1.., value_delimiter = ',')]
     /// Optional filter field.
-    /// Comma-separated path to get to the filter value, which is the last element of the pattern.
-    filter: Option<Filter>,
-    // ... More arguments will come, e.g., for multi-thread.
+    /// Slash-separated path to get to the filter value, which is the last element of the pattern.
+    filter: Option<Vec<Filter>>,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -36,12 +38,18 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Write header using the last pattern.
     // Hope that this last pattern will be "precise" enough.
-    csv_wrt.serialize(("time", args.pattern.0.last().unwrap_or(&"".to_string())))?;
+    let mut header = args
+        .pattern
+        .iter()
+        .map(|p| p.0.last().map_or("", |v| v))
+        .collect::<Vec<_>>();
+    header.insert(0, "time");
+    csv_wrt.serialize(&header)?;
 
     for elem in json_reader {
         let value = elem?;
 
-        if let Some(v) = get_item(&value, &args.pattern, args.filter.as_ref()) {
+        if let Some(v) = get_item(&value, &args.pattern, args.filter.as_deref()) {
             csv_wrt.serialize(v)?;
         }
     }
@@ -51,9 +59,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 fn get_item<'a>(
     value: &'a Value,
-    pattern: &'a Pattern,
-    filter: Option<&'a Filter>,
-) -> Option<(f64, &'a Value)> {
+    patterns: &'a [Pattern],
+    filter: Option<&'a [Filter]>,
+) -> Option<(f64, Vec<&'a Value>)> {
     // First element is always an object.
     let map = value.as_object()?;
 
@@ -62,17 +70,25 @@ fn get_item<'a>(
     let time = map.get("time")?.as_f64()?;
 
     // Potentially filter the entry.
-    if !filter.map(|f| f.filter(value)).unwrap_or(true) {
+    if !filter
+        .map(|filters| filters.iter().all(|f| f.filter(value)))
+        .unwrap_or(true)
+    {
         return None;
     }
 
     // Then we iterate on the requested value.
-    let value = pattern
-        .0
+    let values = patterns
         .iter()
-        .try_fold(value, |v, p| v.as_object().and_then(|m| m.get(p)))?;
+        .map(|pattern| {
+            pattern
+                .0
+                .iter()
+                .try_fold(value, |v, p| convert_value_and_get(v, p))
+        })
+        .collect::<Option<Vec<_>>>()?;
 
-    Some((time, value))
+    Some((time, values))
 }
 
 mod filter;
