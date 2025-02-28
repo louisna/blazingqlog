@@ -40,7 +40,7 @@ For example, to get the congestion window evolution from the following QLOG file
 Use the command:
 
 ```sh
-blazingqlog trace.sqlog data,congestion_window
+blazingqlog trace.sqlog --pattern data/congestion_window
 ```
 
 This will generate a CSV file named `output.csv` (this can be changed with the `--csv` flag) with the following content:
@@ -59,7 +59,7 @@ Thanks to the functionnal programming capabilities of Rust, you can filter out p
 
 Consider the following quiche QLOG file:
 ```
-{"time":5.0535,"name":"transport:packet_sent","data":{"header":{"packet_type":"1RTT","packet_number":1},...}}
+{"time":5.0535,"name":"transport:packet_sent","data":{"header":{"packet_type":"Initial","packet_number":1},...}}
 {"time":5.348,"name":"transport:packet_sent","data":{"header":{"packet_type":"1RTT","packet_number":2},...}}
 {"time":5.555,"name":"transport:packet_received","data":{"header":{"packet_type":"1RTT","packet_number":5},...}}
 {"time":5.664,"name":"recovery:metrics_updated","data":{"bytes_in_flight":7875}}
@@ -69,13 +69,29 @@ Consider the following quiche QLOG file:
 
 The simple following command only retrieves the packet numbers of sent packet, ignoring received packets.
 ```sh
-blazingqlog trace.sqlog data,packet_number --filter name,transport:packet_sent
+blazingqlog trace.sqlog --pattern data/packet_number --filter name/transport:packet_sent
 ```
 
 Without the time to blink an eye, you will get:
 ```
 time,packet_number
 5.0535,1
+5.348,2
+5.85,3
+```
+
+### 💎 Multiple filters and patterns
+
+It is possible to apply multiple filters and patterns simultaneously, by using the `,` separator.
+For example, with the previous QLOG example, it is possible to retrieve the `packet_number` for sent `1RTT` packets only:
+
+```sh
+blazingqlog trace.sqlog --pattern data/packet_number --filter name/transport:packet_sent,data/header/packet_type/1RTT
+```
+
+The output is:
+```
+time,packet_number
 5.348,2
 5.85,3
 ```
