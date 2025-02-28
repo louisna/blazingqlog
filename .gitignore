@@ -1,1 +1,4 @@
 /target
+**/*.csv
+**/*.sqlog
+Cargo.lock
