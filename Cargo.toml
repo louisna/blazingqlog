@@ -2,6 +2,11 @@
 name = "blazingqlog"
 version = "0.1.0"
 edition = "2021"
+description = "QUIC QLOG parser written in Rust."
+readme = "README.md"
+repository = "https://github.com/louisna/blazingqlog"
+license = "MIT"
+keywords = ["QUIC", "QLOG"]
 
 [dependencies]
 clap = { version = "4.5.30", features = ["derive"] }
